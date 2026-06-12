@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>대시보드 - StudyApp</title>
+<link rel="stylesheet" th:href="@{/css/main.css}">
+<style>
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px}
+.stat-label{font-size:12px;color:var(--text-sub);font-weight:500;margin-bottom:6px}
+.stat-value{font-size:24px;font-weight:700;letter-spacing:-1px}
+
+.section-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.section-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px}
+
+.quick-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;cursor:pointer;transition:box-shadow .15s;text-decoration:none;color:inherit;display:block}
+.quick-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.08)}
+.quick-card-icon{font-size:28px;margin-bottom:8px}
+.quick-card-title{font-size:14px;font-weight:700;margin-bottom:4px}
+.quick-card-desc{font-size:12px;color:var(--text-sub)}
+
+.tt-slot{height:20px;border-bottom:1px solid #f0f0f0}
+.tt-full{display:grid;grid-template-columns:52px repeat(5,1fr);border:1px solid var(--border);border-radius:10px;overflow:hidden;min-width:500px}
+.dday-card{display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:1px solid var(--border)}
+.dday-badge{font-weight:700;font-size:14px;padding:4px 10px;border-radius:8px}
+.dday-urgent{background:#fef2f2;color:#ef4444}
+.dday-soon{background:#fff7ed;color:#f59e0b}
+.dday-normal{background:#f0fdf4;color:#22c55e}
+.badge{font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600}
+.badge-red{background:#fef2f2;color:#ef4444}
+.badge-blue{background:#eff6ff;color:#3b82f6}
+.badge-green{background:#f0fdf4;color:#22c55e}
+.timer-wrap { display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 18px;margin-bottom:20px; }
+.timer-btn { display:flex;align-items:center;gap:8px;padding:10px 22px;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;transition:all .2s; }
+.timer-btn.start { background:#10b981;color:#fff; }
+.timer-btn.start:hover { background:#059669; }
+.timer-btn.stop  { background:#ef4444;color:#fff; }
+.timer-btn.stop:hover  { background:#dc2626; }
+.timer-display { font-size:22px;font-weight:700;letter-spacing:2px;color:var(--primary);min-width:80px; }
+.timer-label { font-size:12px;color:var(--text-sub); }
+.timer-status { font-size:13px;color:var(--text-sub);margin-left:auto; }
+.timer-status.running { color:#10b981;font-weight:600; }
+
+</style>
+</head>
+<body>
+<div class="app-layout">
+  <div th:replace="~{fragments/sidebar :: sidebar('dashboard')}"></div>
+  <main class="main-content">
+
+    <!-- 헤더 -->
+    <div class="page-header">
+      <div class="page-title" th:text="'안녕하세요, ' + ${user.name} + '님 👋'"></div>
+      <div class="page-subtitle" id="today-date"></div>
+    </div>
+
+    <!-- 요약 통계 -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">이번 주 수업</div>
+        <div class="stat-value" th:text="${schedules.size()}">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">다가오는 일정</div>
+        <div class="stat-value" th:text="${eventsWithDday.size()}">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">가장 빠른 마감</div>
+        <div class="stat-value" style="font-size:18px"
+             th:text="${eventsWithDday.size()>0} ? (${eventsWithDday[0].dday>=0} ? 'D-'+${eventsWithDday[0].dday} : '지남') : '없음'">없음</div>
+      </div>
+    </div>
+
+
+    <!-- 학습 타이머 -->
+    <div class="timer-wrap">
+      <div>
+        <div class="timer-label">오늘 학습 시간</div>
+        <div class="timer-display" id="timerDisplay">00:00</div>
+      </div>
+      <button class="timer-btn start" id="timerBtn" onclick="toggleTimer()">
+        ▶ 학습 시작
+      </button>
+      <span class="timer-status" id="timerStatus">타이머를 시작하면 학습 시간이 기록됩니다</span>
+    </div>
+
+    <!-- 빠른 메뉴 -->
+    <div class="section-grid-3" style="margin-bottom:20px">
+      <a th:href="@{/notes}" class="quick-card">
+        <div class="quick-card-icon">📝</div>
+        <div class="quick-card-title">학습 노트</div>
+        <div class="quick-card-desc">AI 요약 · 퀴즈 생성</div>
+      </a>
+      <a th:href="@{/recommendation}" class="quick-card">
+        <div class="quick-card-icon">⭐</div>
+        <div class="quick-card-title">취약 과목 추천</div>
+        <div class="quick-card-desc">AI 기반 학습 가이드</div>
+      </a>
+      <a th:href="@{/pages/wrong-answers.html}" class="quick-card">
+        <div class="quick-card-icon">❌</div>
+        <div class="quick-card-title">오답 노트</div>
+        <div class="quick-card-desc">틀린 문제 복습</div>
+      </a>
+      <a th:href="@{/pages/heatmap.html}" class="quick-card">
+        <div class="quick-card-icon">🌿</div>
+        <div class="quick-card-title">학습 히트맵</div>
+        <div class="quick-card-desc">일별 학습량 시각화</div>
+      </a>
+      <a th:href="@{/pages/statistics.html}" class="quick-card">
+        <div class="quick-card-icon">📊</div>
+        <div class="quick-card-title">분석 통계</div>
+        <div class="quick-card-desc">과목별 성취도 분석</div>
+      </a>
+      <a th:href="@{/pages/ranking.html}" class="quick-card">
+        <div class="quick-card-icon">🏆</div>
+        <div class="quick-card-title">소셜 랭킹</div>
+        <div class="quick-card-desc">학습량 순위 비교</div>
+      </a>
+    </div>
+
+    <!-- 최근 학습 노트 -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-title" style="display:flex;align-items:center;justify-content:space-between">
+        📚 최근 학습 노트
+        <a th:href="@{/notes}" style="font-size:12px;color:var(--primary);text-decoration:none;font-weight:500">전체 보기 →</a>
+      </div>
+      <div th:if="${#lists.isEmpty(recentNotes)}"
+           style="color:var(--text-sub);font-size:14px;text-align:center;padding:20px 0">
+        아직 작성한 노트가 없습니다. 노트를 작성해보세요!
+      </div>
+      <div th:unless="${#lists.isEmpty(recentNotes)}">
+        <div th:each="note : ${recentNotes}"
+             style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)">
+          <div>
+            <a th:href="@{/notes/{id}(id=${note.id})}"
+               th:text="${note.title != null and !note.title.isBlank() ? note.title : '제목 없음'}"
+               style="font-size:14px;font-weight:600;color:var(--text-main);text-decoration:none"></a>
+            <div style="font-size:11px;color:var(--text-sub);margin-top:2px"
+                 th:text="${note.subjectId != null and !note.subjectId.isBlank() and note.subjectId != 'general' ? note.subjectId : '과목 미지정'}"></div>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <span th:if="${note.questions != null and !note.questions.isEmpty()}"
+                  style="font-size:11px;padding:3px 8px;background:#ebf4ff;color:#2b6cb0;border-radius:10px">
+              퀴즈 <span th:text="${note.questions.size()}">0</span>문제
+            </span>
+            <span style="font-size:11px;color:var(--text-sub)"
+                  th:text="${note.createdAt != null ? note.createdAt.toLocalDate() : ''}"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 시간표 + D-Day -->
+    <div class="section-grid">
+      <div class="card">
+        <div class="card-title" style="display:flex;align-items:center;justify-content:space-between">
+          주간 시간표
+          <a th:href="@{/schedule}" class="btn btn-secondary btn-sm">편집</a>
+        </div>
+        <div style="overflow-x:auto">
+          <div class="tt-full" id="timetable">
+            <div class="tt-head"></div>
+            <div class="tt-head">월</div>
+            <div class="tt-head">화</div>
+            <div class="tt-head">수</div>
+            <div class="tt-head">목</div>
+            <div class="tt-head">금</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title" style="display:flex;align-items:center;justify-content:space-between">
+          D-Day 일정
+          <a th:href="@{/events}" class="btn btn-secondary btn-sm">+ 추가</a>
+        </div>
+        <div th:if="${eventsWithDday.empty}"
+             style="text-align:center;padding:30px;color:var(--text-sub);font-size:13px">
+          등록된 일정이 없습니다
+        </div>
+        <div th:each="item : ${eventsWithDday}">
+          <div class="dday-card">
+            <div>
+              <div style="font-weight:600;font-size:14px" th:text="${item.event.title}"></div>
+              <div style="font-size:12px;color:var(--text-sub)" th:text="${item.event.subjectName + ' · ' + item.event.dueDate}"></div>
+              <span class="badge"
+                    th:classappend="${item.event.type=='EXAM'}?'badge-red':(${item.event.type=='ASSIGNMENT'}?'badge-blue':'badge-green')"
+                    th:text="${item.event.type=='EXAM'}?'시험':(${item.event.type=='ASSIGNMENT'}?'과제':'기타')"></span>
+            </div>
+            <div class="dday-badge"
+                 th:classappend="${item.dday<=3}?'dday-urgent':(${item.dday<=7}?'dday-soon':'dday-normal')"
+                 th:text="${item.dday==0}?'D-Day':('D-'+item.dday)"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script th:inline="javascript">
+const schedules = /*[[${schedules}]]*/ [];
+const days = ['일','월','화','수','목','금','토'];
+const now = new Date();
+document.getElementById('today-date').textContent =
+  `${now.getFullYear()}년 ${now.getMonth()+1}월 ${now.getDate()}일 (${days[now.getDay()]})`;
+
+const S=8, E=22, CH=40;
+const grid = document.getElementById('timetable');
+for (let h=S; h<=E; h++) {
+  for (let m of [0,30]) {
+    const tl = document.createElement('div');
+    tl.className = 'tt-time-label';
+    if (m===0) tl.textContent = `${h}:00`;
+    grid.appendChild(tl);
+    for (let d=1; d<=5; d++) {
+      const sl = document.createElement('div');
+      sl.className = 'tt-slot';
+      sl.dataset.h = h; sl.dataset.m = m; sl.dataset.d = d;
+      grid.appendChild(sl);
+    }
+  }
+}
+schedules.forEach(s => {
+  const top = (s.startHour-S)*CH + (s.startMinute/60)*CH;
+  const ht = ((s.endHour*60+s.endMinute)-(s.startHour*60+s.startMinute))/60*CH;
+  const ref = grid.querySelector(`.tt-slot[data-d="${s.dayOfWeek}"][data-h="${s.startHour}"][data-m="${s.startMinute<30?0:30}"]`);
+  if (!ref) return;
+  const b = document.createElement('div');
+  b.className = 'tt-block';
+  b.style.cssText = `background:${s.color||'#2563eb'};top:${top}px;height:${ht-2}px;position:absolute;width:100%;`;
+  b.innerHTML = `<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px">${s.subjectName}</div>`;
+  ref.style.position = 'relative';
+  ref.appendChild(b);
+});
+</script>
+
+
+
+
+
+
+
+<script>
+// ── 학습 타이머 (localStorage로 상태 유지) ──
+const TIMER_KEY   = 'studyTimerStart';
+const SAVED_KEY   = 'studyTimerSaved';
+const STATUS_KEY  = 'studyTimerStatus';  // 'running' | 'stopped'
+const TOTAL_KEY   = 'studyTimerTotal';   // 정지 시 총 분 저장
+const DATE_KEY    = 'studyTimerDate';    // 타이머 날짜 (자정 초기화용)
+
+// 자정이 넘으면 남은 시간 저장 후 초기화
+function checkDateReset() {
+    const today = new Date().toISOString().slice(0, 10);
+    const savedDate = localStorage.getItem(DATE_KEY);
+    if (savedDate && savedDate !== today) {
+        // 날짜가 바뀌었으면 실행 중인 타이머 남은 시간 저장
+        if (localStorage.getItem(STATUS_KEY) === 'running') {
+            const startTime = parseInt(localStorage.getItem(TIMER_KEY) || '0');
+            const savedSec  = parseInt(localStorage.getItem(SAVED_KEY) || '0');
+            if (startTime) {
+                const elapsed  = Math.floor((Date.now() - startTime) / 1000);
+                const totalMin = Math.floor(elapsed / 60);
+                const savedMin = Math.floor(savedSec / 60);
+                const remain   = totalMin - savedMin;
+                if (remain > 0) {
+                    // sendBeacon으로 저장 (페이지 이탈과 동일)
+                    navigator.sendBeacon('/api/study-log/save',
+                        new Blob([JSON.stringify({minutes: remain})],
+                        {type: 'application/json'}));
+                }
+            }
+        }
+        // 모두 초기화
+        localStorage.removeItem(TIMER_KEY);
+        localStorage.removeItem(SAVED_KEY);
+        localStorage.removeItem(STATUS_KEY);
+        localStorage.removeItem(TOTAL_KEY);
+        localStorage.removeItem(DATE_KEY);
+    }
+    // 오늘 날짜 저장
+    localStorage.setItem(DATE_KEY, today);
+}
+
+let _displayInterval = null;
+let _saveInterval    = null;
+
+async function saveStudyTime(minutes) {
+    if (minutes <= 0) return;
+    try {
+        await fetch('/api/study-log/save', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            credentials: 'same-origin',
+            body: JSON.stringify({minutes: minutes})
+        });
+    } catch(e) {}
+}
+
+function isRunning() { return localStorage.getItem(STATUS_KEY) === 'running'; }
+
+function toggleTimer() {
+    if (!isRunning()) startTimer(); else stopTimer();
+}
+
+function startTimer() {
+    // 이전 기록이 있으면 누적 (TOTAL_KEY에 저장된 분)
+    // 서버에는 이미 저장됐으므로 화면 표시만 이어서
+    localStorage.setItem(TIMER_KEY, Date.now());
+    localStorage.setItem(SAVED_KEY, '0');
+    localStorage.setItem(STATUS_KEY, 'running');
+    // TOTAL_KEY는 유지 (이전 기록 표시용)
+    updateUI();
+    startIntervals();
+}
+
+function stopTimer() {
+    const startTime = parseInt(localStorage.getItem(TIMER_KEY) || '0');
+    const savedSec  = parseInt(localStorage.getItem(SAVED_KEY) || '0');
+    const elapsed   = Math.floor((Date.now() - startTime) / 1000);
+    const totalMin  = Math.floor(elapsed / 60);
+    const savedMin  = Math.floor(savedSec / 60);
+    const remain    = totalMin - savedMin;
+    if (remain > 0) saveStudyTime(remain);
+
+    // 이전 기록 + 이번 기록 합산
+    const prevMin = parseInt(localStorage.getItem(TOTAL_KEY) || '0');
+    const accTotal = prevMin + totalMin;
+
+    localStorage.setItem(STATUS_KEY, 'stopped');
+    localStorage.setItem(TOTAL_KEY, String(accTotal));
+    localStorage.removeItem(TIMER_KEY);
+    localStorage.removeItem(SAVED_KEY);
+
+    // 노트 과목별 학습 시간 localStorage 초기화
+    Object.keys(localStorage)
+        .filter(k => k.startsWith('noteStudyStart_') || k.startsWith('noteStudySaved_'))
+        .forEach(k => localStorage.removeItem(k));
+
+    clearInterval(_displayInterval);
+    clearInterval(_saveInterval);
+    updateUI();
+}
+
+function startIntervals() {
+    clearInterval(_displayInterval);
+    clearInterval(_saveInterval);
+
+    // 1초마다 화면 업데이트
+    _displayInterval = setInterval(() => {
+        if (!isRunning()) { clearInterval(_displayInterval); return; }
+        const startTime = parseInt(localStorage.getItem(TIMER_KEY) || '0');
+        if (!startTime) return;
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const m = Math.floor(elapsed / 60);
+        const s = elapsed % 60;
+        document.getElementById('timerDisplay').textContent =
+            String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+        // 이전 기록 있으면 status에 표시
+        const prevMin = parseInt(localStorage.getItem(TOTAL_KEY) || '0');
+        if (prevMin > 0) {
+            document.getElementById('timerStatus').textContent =
+                `학습 중... (이전 기록: ${prevMin}분)`;
+        }
+    }, 1000);
+
+    // 1분마다 서버 저장
+    _saveInterval = setInterval(() => {
+        if (!isRunning()) { clearInterval(_saveInterval); return; }
+        const startTime = parseInt(localStorage.getItem(TIMER_KEY) || '0');
+        const savedSec  = parseInt(localStorage.getItem(SAVED_KEY) || '0');
+        if (!startTime) return;
+        const elapsedSec = Math.floor((Date.now() - startTime) / 1000);
+        const newMin = Math.floor(elapsedSec / 60) - Math.floor(savedSec / 60);
+        if (newMin > 0) {
+            localStorage.setItem(SAVED_KEY, String(elapsedSec));
+            saveStudyTime(newMin);
+        }
+    }, 60000);
+}
+
+function updateUI() {
+    const btn    = document.getElementById('timerBtn');
+    const status = document.getElementById('timerStatus');
+    const disp   = document.getElementById('timerDisplay');
+    const timerStatus = localStorage.getItem(STATUS_KEY);
+
+    if (timerStatus === 'running') {
+        // 실행 중 - 경과 시간 표시
+        const startTime = parseInt(localStorage.getItem(TIMER_KEY) || '0');
+        if (startTime) {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const m = Math.floor(elapsed / 60);
+            const s = elapsed % 60;
+            disp.textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+        }
+        const prevMin = parseInt(localStorage.getItem(TOTAL_KEY) || '0');
+        btn.textContent = '⏹ 학습 종료';
+        btn.className = 'timer-btn stop';
+        status.textContent = prevMin > 0 ? `학습 중... (이전 기록: ${prevMin}분)` : '학습 중...';
+        status.className = 'timer-status running';
+
+    } else if (timerStatus === 'stopped') {
+        // 정지됨 - 누적 기록 완료 표시
+        const accMin = parseInt(localStorage.getItem(TOTAL_KEY) || '0');
+        btn.textContent = '▶ 학습 계속';
+        btn.className = 'timer-btn start';
+        disp.textContent = '00:00';
+        status.textContent = accMin > 0 ? `오늘 총 ${accMin}분 기록 ✓` : '타이머를 시작하면 학습 시간이 기록됩니다';
+        status.className = 'timer-status';
+
+    } else {
+        // 초기 상태
+        btn.textContent = '▶ 학습 시작';
+        btn.className = 'timer-btn start';
+        disp.textContent = '00:00';
+        status.textContent = '타이머를 시작하면 학습 시간이 기록됩니다';
+        status.className = 'timer-status';
+    }
+}
+
+// 페이지 로드 시 자정 체크 후 상태 복원
+window.addEventListener('DOMContentLoaded', () => {
+    checkDateReset();
+    updateUI();
+    if (isRunning()) startIntervals();
+});
+
+// 페이지 이탈 시 실행 중이면 저장
+window.addEventListener('beforeunload', () => {
+    if (!isRunning()) return;
+    const startTime = parseInt(localStorage.getItem(TIMER_KEY) || '0');
+    const savedSec  = parseInt(localStorage.getItem(SAVED_KEY) || '0');
+    const elapsed   = Math.floor((Date.now() - startTime) / 1000);
+    const totalMin  = Math.floor(elapsed / 60);
+    const savedMin  = Math.floor(savedSec / 60);
+    const remain    = totalMin - savedMin;
+    if (remain > 0) {
+        navigator.sendBeacon('/api/study-log/save',
+            new Blob([JSON.stringify({minutes: remain})], {type: 'application/json'}));
+    }
+});
+</script>
+
+</body>
+</html>

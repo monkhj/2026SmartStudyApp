@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>일정 관리 - StudyApp</title>
+  <link rel="stylesheet" th:href="@{/css/main.css}">
+</head>
+<body>
+<div class="app-layout">
+  <div th:replace="~{fragments/sidebar :: sidebar('events')}"></div>
+  <main class="main-content">
+
+    <div class="page-header" style="display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div class="page-title">일정 관리</div>
+        <div class="page-subtitle">시험·과제 마감일 D-Day 카운트다운</div>
+      </div>
+      <button class="btn btn-primary" onclick="openAddModal()">+ 일정 추가</button>
+    </div>
+
+    <!-- D-Day 강조 카드 (상위 3개) -->
+    <div class="grid-3" style="margin-bottom:20px">
+      <div th:each="item,idx : ${eventsWithDday}" th:if="${idx.index < 3}">
+        <div class="card" style="text-align:center;border-top:3px solid"
+             th:style="${item.dday <= 3} ? 'border-top-color:var(--danger)' : (${item.dday <= 7} ? 'border-top-color:var(--warning)' : 'border-top-color:var(--accent)')">
+          <div style="font-size:11px;font-weight:600;color:var(--text-sub);margin-bottom:4px"
+               th:text="${item.event.type == 'EXAM'} ? '📝 시험' : (${item.event.type == 'ASSIGNMENT'} ? '📋 과제' : '📌 기타')"></div>
+          <div style="font-size:14px;font-weight:700;margin-bottom:8px" th:text="${item.event.title}"></div>
+          <div style="font-size:28px;font-weight:800"
+               th:classappend="${item.dday <= 3} ? 'dday-urgent' : (${item.dday <= 7} ? 'dday-soon' : 'dday-normal')"
+               th:text="${item.dday == 0} ? 'D-Day' : ('D-' + item.dday)"></div>
+          <div style="font-size:11px;color:var(--text-sub);margin-top:8px" th:text="${item.event.dueDate}"></div>
+        </div>
+      </div>
+      <div th:if="${eventsWithDday.empty}" style="grid-column:span 3;text-align:center;padding:30px;color:var(--text-sub)">
+        다가오는 일정이 없습니다
+      </div>
+    </div>
+
+    <!-- 전체 목록 -->
+    <div class="card">
+      <div class="card-title">전체 일정</div>
+      <div th:if="${allEvents.empty}" style="text-align:center;padding:30px;color:var(--text-sub)">등록된 일정이 없습니다</div>
+      <table class="event-table" th:unless="${allEvents.empty}">
+        <thead>
+          <tr>
+            <th>완료</th><th>제목</th><th>과목</th><th>유형</th><th>마감일</th><th>D-Day</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr th:each="item : ${allEvents}" th:classappend="${item.event.completed} ? 'completed'">
+            <td>
+              <input type="checkbox" th:checked="${item.event.completed}"
+                     th:data-id="${item.event.id}" onclick="toggleEvent(this.getAttribute('data-id'))" 
+                     style="cursor:pointer;width:16px;height:16px">
+            </td>
+            <td>
+              <div style="font-weight:600" th:text="${item.event.title}"></div>
+              <div style="font-size:11px;color:var(--text-sub)" th:text="${item.event.description}"></div>
+            </td>
+            <td th:text="${item.event.subjectName ?: '-'}"></td>
+            <td>
+              <span class="badge"
+                th:classappend="${item.event.type == 'EXAM'} ? 'badge-red' : (${item.event.type == 'ASSIGNMENT'} ? 'badge-blue' : 'badge-green')"
+                th:text="${item.event.type == 'EXAM'} ? '시험' : (${item.event.type == 'ASSIGNMENT'} ? '과제' : '기타')"></span>
+            </td>
+            <td th:text="${item.event.dueDate}"></td>
+            <td>
+              <span th:classappend="${item.dday <= 3} ? 'dday-urgent' : (${item.dday <= 7} ? 'dday-soon' : 'dday-normal')"
+                    style="font-weight:700"
+                    th:text="${item.dday == 0} ? 'D-Day' : (${item.dday < 0} ? '종료' : 'D-' + ${item.dday})"></span>
+            </td>
+            <td>
+              <button class="btn btn-secondary btn-sm" th:data-id="${item.event.id}" onclick="deleteEvent(this.getAttribute('data-id'))">삭제</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<!-- 일정 추가 모달 -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">일정 추가</div>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">제목 <span style="color:var(--danger)">*</span></label>
+      <input type="text" id="title" class="form-input" placeholder="예: 알고리즘 기말고사">
+    </div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label class="form-label">유형</label>
+        <select id="type" class="form-input">
+          <option value="EXAM">📝 시험</option>
+          <option value="ASSIGNMENT">📋 과제</option>
+          <option value="OTHER">📌 기타</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">과목명</label>
+        <input type="text" id="subjectName" class="form-input" placeholder="관련 과목">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">마감일 <span style="color:var(--danger)">*</span></label>
+      <input type="date" id="dueDate" class="form-input">
+    </div>
+    <div class="form-group">
+      <label class="form-label">메모</label>
+      <textarea id="description" class="form-input" rows="3" placeholder="추가 설명"></textarea>
+    </div>
+    <div class="notification-settings mb-3">
+    <label class="form-label fw-bold">알림 설정</label>
+    <div class="form-check form-switch mb-2">
+        <input class="form-check-input" type="checkbox" id="notificationEnabled" checked>
+        <label class="form-check-label" for="notificationEnabled">이메일 알림 받기</label>
+    </div>
+    <select class="form-select form-select-sm" id="notifyBefore" multiple>
+        <option value="7" selected>7일 전</option>
+        <option value="3" selected>3일 전</option>
+        <option value="1" selected>1일 전</option>
+    </select>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-secondary" onclick="closeModal()">취소</button>
+      <button class="btn btn-primary" onclick="addEvent()">추가</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function openAddModal() {
+  document.getElementById('dueDate').value = new Date().toISOString().split('T')[0];
+  document.getElementById('addModal').classList.add('active');
+}
+function closeModal() { document.getElementById('addModal').classList.remove('active'); }
+
+async function addEvent() {
+  const title   = document.getElementById('title').value.trim();
+  const dueDate = document.getElementById('dueDate').value;
+  if (!title)   { alert('제목을 입력하세요.'); return; }
+  if (!dueDate) { alert('마감일을 선택하세요.'); return; }
+
+  const res = await fetch('/events/add', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      title, dueDate,
+      type:        document.getElementById('type').value,
+      subjectName: document.getElementById('subjectName').value,
+      description: document.getElementById('description').value
+    })
+    
+  });
+  if (res.ok) location.reload();
+  else alert('추가 실패.');
+}
+
+async function toggleEvent(id) {
+  await fetch(`/events/${id}/toggle`, { method: 'POST' });
+  location.reload();
+}
+
+async function deleteEvent(id) {
+  if (!confirm('이 일정을 삭제하시겠습니까?')) return;
+  const res = await fetch(`/events/${id}`, { method: 'DELETE' });
+  if (res.ok) location.reload();
+}
+</script>
+</body>
+</html>

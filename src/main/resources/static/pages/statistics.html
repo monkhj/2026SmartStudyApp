@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>분석 통계 | Smart Study AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f6fa;--surface:#fff;--border:#e4e6ef;
+  --text1:#1a1d27;--text2:#5a5f7a;--text3:#9499b5;
+  --accent:#4f6ef7;--accent-bg:#eef1fe;
+  --green:#22c55e;--amber:#f59e0b;--red:#ef4444;
+  --radius:14px;--shadow:0 1px 4px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.04);
+}
+body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);color:var(--text1);padding:32px}
+.page-wrap{max-width:960px;margin:0 auto}
+.page-title{font-size:22px;font-weight:700;letter-spacing:-.4px;margin-bottom:4px}
+.page-sub{font-size:14px;color:var(--text2);margin-bottom:28px}
+.summary-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:28px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow)}
+.stat-label{font-size:12px;color:var(--text2);margin-bottom:6px}
+.stat-value{font-size:24px;font-weight:700;letter-spacing:-.5px}
+.stat-value.accent{color:var(--accent)}.stat-value.up{color:var(--green)}.stat-value.bad{color:var(--red)}
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow)}
+.card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+.card-title{font-size:15px;font-weight:700}
+.tab-group{display:flex;gap:4px}
+.tab{font-family:'Pretendard',sans-serif;font-size:12px;font-weight:500;padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;transition:all .15s}
+.tab.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.chart-wrap{position:relative;height:260px}
+.legend-row{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:12px;font-size:12px;color:var(--text2)}
+.legend-dot{width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:4px;vertical-align:middle}
+.alert-card{background:var(--surface);border:1px solid #fde68a;border-left:4px solid var(--amber);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow);margin-bottom:20px;display:none}
+.alert-title{font-size:14px;font-weight:700;color:#92400e;margin-bottom:6px}
+.alert-list{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+.alert-pill{font-size:12px;font-weight:600;padding:4px 12px;border-radius:20px;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa}
+.trend-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow)}
+.error-msg{background:#fef2f2;border:1px solid #fecaca;color:#dc2626;padding:14px 18px;border-radius:10px;font-size:14px;margin-bottom:16px;display:none}
+.skeleton{background:linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:6px;display:block}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+</style>
+</head>
+<body>
+<div class="page-wrap">
+  <h1 class="page-title">📊 분석 통계</h1>
+  <p class="page-sub">과목별 성취도와 학습 시간 분포를 정량적으로 확인하세요</p>
+  <div id="errorMsg" class="error-msg">데이터를 불러오지 못했습니다.</div>
+
+  <div class="summary-row">
+    <div class="stat-card"><div class="stat-label">전체 평균 정답률</div><div class="stat-value accent" id="avgAcc"><span class="skeleton" style="width:60px;height:24px"></span></div></div>
+    <div class="stat-card"><div class="stat-label">최고 성취 과목</div><div class="stat-value up" id="bestSubject"><span class="skeleton" style="width:80px;height:24px"></span></div></div>
+    <div class="stat-card"><div class="stat-label">취약 과목</div><div class="stat-value bad" id="weakSubject"><span class="skeleton" style="width:80px;height:24px"></span></div></div>
+    <div class="stat-card"><div class="stat-label">주간 총 학습</div><div class="stat-value accent" id="weekTotal"><span class="skeleton" style="width:60px;height:24px"></span></div></div>
+  </div>
+
+  <div class="alert-card" id="alertCard">
+    <div class="alert-title">⚠️ 재학습 권장 과목</div>
+    <p style="font-size:13px;color:#92400e">정답률이 60% 미만인 과목이 있습니다.</p>
+    <div class="alert-list" id="alertList"></div>
+  </div>
+
+  <div class="charts-grid">
+    <div class="card">
+      <div class="card-head"><span class="card-title">과목별 정답률</span><span style="font-size:12px;color:var(--text3)">🟢 80%↑ 🟡 60%↑ 🔴 60%↓</span></div>
+      <div class="chart-wrap"><canvas id="radarChart" role="img" aria-label="과목별 정답률 막대 차트">과목별 정답률</canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">과목별 학습 시간</span>
+        <div class="tab-group">
+          <button class="tab on" onclick="switchBar(this,'week')">주간</button>
+          <button class="tab" onclick="switchBar(this,'month')">월간</button>
+        </div>
+      </div>
+      <div class="legend-row" id="barLegend"></div>
+      <div class="chart-wrap"><canvas id="barChart" role="img" aria-label="과목별 학습 시간 막대 차트">과목별 학습 시간</canvas></div>
+    </div>
+  </div>
+
+  <div class="trend-card">
+    <div class="card-head">
+      <span class="card-title">퀴즈 점수 추이</span>
+      <div class="tab-group" id="trendTabs">
+        <button class="tab on" onclick="switchTrend(this,'all')">전체</button>
+      </div>
+    </div>
+    <div style="position:relative;height:220px">
+      <canvas id="trendChart" role="img" aria-label="퀴즈 점수 추이 라인 차트">점수 변화</canvas>
+    </div>
+  </div>
+</div>
+
+<script>
+const COLORS = ['#4f6ef7','#22c55e','#f59e0b','#ef4444','#a855f7','#06b6d4'];
+let statData = null;
+let barChartInst = null;
+let trendChartInst = null;
+
+async function apiFetch(url) {
+    const token = localStorage.getItem('accessToken');
+    const headers = token ? {'Authorization': 'Bearer ' + token} : {};
+    const res = await fetch(url, {
+        headers: headers,
+        credentials: 'include'
+    });
+    if (res.status === 401) { location.href = '/auth/login'; return null; }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return res.json();
+}
+
+async function init() {
+    try {
+        statData = await apiFetch('/api/analytics/statistics');
+        if (!statData) return;
+
+        const { subjects, radarData, weekData, monthData, trendLabels, trendAll } = statData;
+
+        // 요약 통계
+        const avg = radarData.length > 0 ? Math.round(radarData.reduce((a,b)=>a+b,0) / radarData.length) : 0;
+        const bestIdx = radarData.length > 0 ? radarData.indexOf(Math.max(...radarData)) : -1;
+        const weakIdx = radarData.length > 0 ? radarData.indexOf(Math.min(...radarData)) : -1;
+        document.getElementById('avgAcc').textContent     = avg + '%';
+        document.getElementById('bestSubject').textContent = bestIdx >= 0 ? subjects[bestIdx] : '-';
+        document.getElementById('weakSubject').textContent = weakIdx >= 0 ? subjects[weakIdx] : '-';
+        document.getElementById('weekTotal').textContent   = weekData.length > 0 ? weekData.reduce((a,b)=>a+b,0) + '분' : '0분';
+
+        // 취약 과목 경고
+        const weak = subjects.filter((_,i) => radarData[i] < 60);
+        if (weak.length) {
+            document.getElementById('alertCard').style.display = 'block';
+            document.getElementById('alertList').innerHTML = weak.map(s =>
+                `<span class="alert-pill">${s} (${radarData[subjects.indexOf(s)]}%)</span>`
+            ).join('');
+        }
+
+        // 과목별 정답률 수평 막대 차트
+        new Chart(document.getElementById('radarChart'), {
+            type: 'bar',
+            data: {
+                labels: subjects,
+                datasets: [{
+                    label: '정답률(%)',
+                    data: radarData,
+                    backgroundColor: subjects.map((_, i) => {
+                        const v = radarData[i];
+                        return v >= 80 ? 'rgba(34,197,94,0.8)'
+                             : v >= 60 ? 'rgba(245,158,11,0.8)'
+                             : 'rgba(239,68,68,0.8)';
+                    }),
+                    borderRadius: 6,
+                    borderSkipped: false
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        min: 0, max: 100,
+                        grid: { color: '#f0f1f5' },
+                        ticks: { font:{size:10}, color:'#9499b5', callback: v => v + '%' }
+                    },
+                    y: {
+                        grid: { display: false },
+                        ticks: { font:{size:11}, color:'#1a1d27' }
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: c => ` ${c.parsed.x}%` } }
+                }
+            }
+        });
+
+        // 막대 차트 범례
+        document.getElementById('barLegend').innerHTML = subjects.map((s,i) =>
+            `<span style="display:flex;align-items:center;gap:4px">
+              <span class="legend-dot" style="background:${COLORS[i%COLORS.length]}"></span>${s}
+            </span>`
+        ).join('');
+
+        // 막대 차트
+        barChartInst = new Chart(document.getElementById('barChart'), {
+            type:'bar',
+            data:{ labels:subjects, datasets:[{ label:'학습 시간(분)', data:weekData,
+                backgroundColor:subjects.map((_,i)=>COLORS[i%COLORS.length]+'bb'),
+                borderRadius:6, borderSkipped:false }] },
+            options:{ responsive:true, maintainAspectRatio:false,
+                scales:{ x:{grid:{display:false},ticks:{font:{size:10},color:'#5a5f7a'}},
+                         y:{grid:{color:'#f0f1f5'},ticks:{font:{size:10},color:'#9499b5'},beginAtZero:true} },
+                plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>` ${c.parsed.y}분`}} } }
+        });
+
+        // 점수 추이
+        trendChartInst = new Chart(document.getElementById('trendChart'), {
+            type:'line',
+            data:{ labels:trendLabels, datasets:[{ label:'평균 점수', data:trendAll,
+                borderColor:'#4f6ef7', backgroundColor:'rgba(79,110,247,.08)',
+                borderWidth:2, pointBackgroundColor:'#4f6ef7', pointRadius:4, tension:0.35, fill:true }] },
+            options:{ responsive:true, maintainAspectRatio:false,
+                scales:{ x:{grid:{display:false},ticks:{font:{size:10},color:'#5a5f7a'}},
+                         y:{min:0,max:100,grid:{color:'#f0f1f5'},ticks:{font:{size:10},color:'#9499b5',callback:v=>v+'%'}} },
+                plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>` ${c.parsed.y}점`}} } }
+        });
+
+        // 추이 탭에 과목 버튼 추가
+        const tabsEl = document.getElementById('trendTabs');
+        subjects.forEach(s => {
+            const btn = document.createElement('button');
+            btn.className='tab'; btn.textContent=s;
+            btn.onclick = function(){ switchTrend(this, s); };
+            tabsEl.appendChild(btn);
+        });
+
+    } catch(e) {
+        document.getElementById('errorMsg').style.display = 'block';
+        console.error(e);
+    }
+}
+
+function switchBar(btn, period) {
+    btn.closest('.tab-group').querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+    btn.classList.add('on');
+    if (!barChartInst || !statData) return;
+    barChartInst.data.datasets[0].data = period==='week' ? statData.weekData : statData.monthData;
+    barChartInst.update();
+}
+
+function switchTrend(btn, key) {
+    btn.closest('.tab-group').querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+    btn.classList.add('on');
+    if (!trendChartInst || !statData) return;
+    // 전체는 trendAll 사용, 특정 과목은 서버에서 추가 요청 (현재는 trendAll 공용)
+    trendChartInst.data.datasets[0].label = key==='all'?'평균 점수':key;
+    trendChartInst.update();
+}
+
+init();
+</script>
+</body>
+</html>

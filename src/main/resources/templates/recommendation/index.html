@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>학습 추천 — Smart Study AI</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/main.css}">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Pretendard', sans-serif; background: #f0fafa; color: #1a1a2e; }
+
+        .nudge-bar { display:flex;align-items:center;gap:12px;background:#fff;border:1.5px solid #ffb3b3;border-radius:12px;padding:14px 18px;margin-bottom:20px; }
+        .nudge-bar.hidden { display:none; }
+        .nudge-icon { width:32px;height:32px;border-radius:8px;background:#fff0f0;color:#ff6b6b;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0; }
+        .nudge-text { flex:1; }
+        .nudge-title { font-size:13px;font-weight:500;margin-bottom:2px; }
+        .nudge-sub { font-size:12px;color:#aaa; }
+        .nudge-btn { background:#2bc5b4;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap; }
+        .nudge-btn:hover { background:#22a898; }
+
+        .stat-row { display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px; }
+        .stat-card { background:#fff;border:0.5px solid #e8f5f5;border-radius:12px;padding:16px; }
+        .stat-label { font-size:11px;color:#aaa;margin-bottom:6px; }
+        .stat-val { font-size:22px;font-weight:500; }
+        .stat-sub { font-size:11px;color:#ccc;margin-top:4px; }
+        .c-red{color:#ff6b6b} .c-amber{color:#f5a623} .c-teal{color:#2bc5b4} .c-gray{color:#888}
+
+        .two-col { display:grid;grid-template-columns:1fr 1fr;gap:16px; }
+        .rec-card { background:#fff;border:0.5px solid #e8f5f5;border-radius:14px;padding:20px; }
+        .rec-card-title { font-size:14px;font-weight:500;color:#1a1a2e;display:flex;align-items:center;gap:6px;margin-bottom:16px; }
+        .rec-card-title i { font-size:15px;color:#2bc5b4; }
+
+        .subj-row { display:flex;align-items:center;gap:12px;margin-bottom:14px; }
+        .subj-row:last-child { margin-bottom:0; }
+        .subj-dot { width:8px;height:8px;border-radius:50%;flex-shrink:0; }
+        .subj-name { font-size:13px;color:#333;width:110px;flex-shrink:0; }
+        .bar-bg { flex:1;height:6px;background:#f0f0f0;border-radius:3px;overflow:hidden; }
+        .bar-fg { height:6px;border-radius:3px; }
+        .subj-pct { font-size:13px;font-weight:500;width:40px;text-align:right; }
+        .subj-tag { font-size:10px;padding:2px 7px;border-radius:6px;margin-left:4px;flex-shrink:0; }
+        .tag-weak{background:#fff0f0;color:#ff6b6b} .tag-mid{background:#fff8ee;color:#f5a623} .tag-ok{background:#e6faf8;color:#2bc5b4}
+
+        .rec-item { display:flex;align-items:flex-start;gap:10px;background:#f8fffe;border:0.5px solid #d0f0ec;border-radius:10px;padding:12px 14px;margin-bottom:8px; }
+        .rec-item:last-child { margin-bottom:0; }
+        .rec-icon { width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:1px; }
+        .rec-icon.red{background:#fff0f0;color:#ff6b6b} .rec-icon.amber{background:#fff8ee;color:#f5a623} .rec-icon.teal{background:#e6faf8;color:#2bc5b4}
+        .rec-body { flex:1; }
+        .rec-title { font-size:13px;font-weight:500;margin-bottom:2px; }
+        .rec-sub { font-size:11px;color:#aaa; }
+        .rec-go { background:none;border:none;font-size:11px;color:#2bc5b4;cursor:pointer;white-space:nowrap;padding-top:2px; }
+        .rec-go:hover { text-decoration:underline; }
+        .rec-go.done { color:#aaa;cursor:default; }
+
+        .full-card { background:#fff;border:0.5px solid #e8f5f5;border-radius:14px;padding:20px;margin-top:16px; }
+        .history-grid { display:grid;grid-template-columns:repeat(5,1fr);gap:8px; }
+        .history-item { background:#f8fffe;border:0.5px solid #e0f7f4;border-radius:8px;padding:10px 12px; }
+        .history-subj { font-size:11px;color:#aaa;margin-bottom:4px; }
+        .history-score { font-size:14px;font-weight:500; }
+        .history-date { font-size:10px;color:#ccc;margin-top:2px; }
+    </style>
+</head>
+<body>
+<div class="app-layout">
+    <!-- 공통 사이드바 -->
+    <div th:replace="~{fragments/sidebar :: sidebar('recommendation')}"></div>
+
+    <main class="main-content">
+        <div class="page-header">
+            <div class="page-title">⭐ 학습 추천</div>
+            <div class="page-subtitle">퀴즈 정답률 분석을 바탕으로 재학습이 필요한 과목을 알려드려요</div>
+        </div>
+
+        <!-- 넛지 배너 -->
+        <div class="nudge-bar" th:classappend="${!hasWeak} ? 'hidden'">
+            <div class="nudge-icon"><i class="ti ti-alert-triangle"></i></div>
+            <div class="nudge-text">
+                <div class="nudge-title">
+                    취약 과목 <span th:text="${summary.weakSubjectCount()}">2</span>개가 감지됐어요 —
+                    <span th:text="${weakNames}"></span>
+                </div>
+                <div class="nudge-sub">정답률 60% 미만 과목은 오늘 복습하는 것을 권장합니다</div>
+            </div>
+            <button class="nudge-btn" onclick="location.href='/notes'">퀴즈 바로 시작 ↗</button>
+        </div>
+
+        <!-- 통계 카드 -->
+        <div class="stat-row">
+            <div class="stat-card">
+                <div class="stat-label">전체 과목 수</div>
+                <div class="stat-val c-gray" th:text="${summary.totalSubjects()}">4</div>
+                <div class="stat-sub">이번 학기</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">취약 과목</div>
+                <div class="stat-val c-red" th:text="${summary.weakSubjectCount()}">2</div>
+                <div class="stat-sub">정답률 60% 미만</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">평균 정답률</div>
+                <div class="stat-val c-amber" th:text="${summary.overallAvgAccuracy()} + '%'">61%</div>
+                <div class="stat-sub">전체 과목 평균</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">총 퀴즈 응시</div>
+                <div class="stat-val c-teal" th:text="${summary.totalQuizCount()} + '회'">30회</div>
+                <div class="stat-sub">누적 응시</div>
+            </div>
+        </div>
+
+        <!-- 과목별 정답률 + AI 추천 -->
+        <div class="two-col">
+            <div class="rec-card">
+                <div class="rec-card-title"><i class="ti ti-chart-bar"></i> 과목별 정답률</div>
+                <div class="subj-row" th:each="s : ${allSubjects}">
+                    <div class="subj-dot"
+                         th:style="${s.averageAccuracy() < 60} ? 'background:#ff6b6b' : (${s.averageAccuracy() < 80} ? 'background:#f5a623' : 'background:#2bc5b4')"></div>
+                    <div class="subj-name" th:text="${s.subjectName()}"></div>
+                    <div class="bar-bg">
+                        <div class="bar-fg"
+                             th:style="'width:' + ${s.averageAccuracy()} + '%;background:' + (${s.averageAccuracy() < 60} ? '#ff6b6b' : (${s.averageAccuracy() < 80} ? '#f5a623' : '#2bc5b4'))"></div>
+                    </div>
+                    <div class="subj-pct"
+                         th:text="${s.averageAccuracy()} + '%'"
+                         th:class="${s.averageAccuracy() < 60} ? 'subj-pct c-red' : (${s.averageAccuracy() < 80} ? 'subj-pct c-amber' : 'subj-pct c-teal')">42%</div>
+                    <span class="subj-tag"
+                          th:classappend="${s.averageAccuracy() < 60} ? 'tag-weak' : (${s.averageAccuracy() < 80} ? 'tag-mid' : 'tag-ok')"
+                          th:text="${s.averageAccuracy() < 60} ? '취약' : (${s.averageAccuracy() < 80} ? '보통' : '우수')">취약</span>
+                </div>
+            </div>
+
+            <div class="rec-card">
+                <div class="rec-card-title"><i class="ti ti-sparkles"></i> AI 재학습 추천</div>
+                <div class="rec-item" th:each="s : ${allSubjects}">
+                    <div class="rec-icon"
+                         th:classappend="${s.averageAccuracy() < 60} ? 'red' : (${s.averageAccuracy() < 80} ? 'amber' : 'teal')">
+                        <i th:class="${s.averageAccuracy() < 60} ? 'ti ti-alert-circle' : (${s.averageAccuracy() < 80} ? 'ti ti-refresh' : 'ti ti-check')"></i>
+                    </div>
+                    <div class="rec-body">
+                        <div class="rec-title"
+                             th:text="${s.subjectName()} + ' — ' + (${s.averageAccuracy() < 60} ? '즉시 복습 권장' : (${s.averageAccuracy() < 80} ? '복습 주기 도래' : '유지 중'))">
+                            자료구조 — 즉시 복습 권장
+                        </div>
+                        <div class="rec-sub"
+                             th:text="'정답률 ' + ${s.averageAccuracy()} + '% · 퀴즈 ' + ${s.quizCount()} + '회 응시'">
+                            정답률 42% · 퀴즈 8회 응시
+                        </div>
+                    </div>
+                    <button class="rec-go"
+                            th:classappend="${s.averageAccuracy() >= 60} ? 'done'"
+                            th:data-subject="${s.subjectName()}"
+                            th:data-weak="${s.averageAccuracy() < 60}"
+                            th:text="${s.averageAccuracy() < 60} ? '퀴즈 생성 ↗' : '예약됨'">퀴즈 생성 ↗</button>
+                </div>
+            </div>
+        </div>
+
+
+    </main>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.rec-go').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var isWeak  = btn.dataset.weak === 'true';
+                var subject = btn.dataset.subject;
+                if (isWeak && subject) {
+                    location.href = '/notes?subject=' + encodeURIComponent(subject);
+                }
+            });
+        });
+    });
+</script>
+</body>
+</html>

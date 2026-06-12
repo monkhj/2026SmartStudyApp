@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>학습 히트맵 | Smart Study AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f6fa;--surface:#fff;--border:#e4e6ef;
+  --text1:#1a1d27;--text2:#5a5f7a;--text3:#9499b5;
+  --accent:#4f6ef7;--accent-bg:#eef1fe;
+  --h0:#ebedf0;--h1:#9be9a8;--h2:#40c463;--h3:#30a14e;--h4:#216e39;
+  --radius:14px;--shadow:0 1px 4px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.04);
+}
+body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);color:var(--text1);padding:32px}
+.page-wrap{max-width:980px;margin:0 auto}
+.page-title{font-size:22px;font-weight:700;letter-spacing:-.4px;margin-bottom:4px}
+.page-sub{font-size:14px;color:var(--text2);margin-bottom:28px}
+
+/* 오늘 공부시간 카드 (강조) */
+.today-card{background:linear-gradient(135deg,#4f6ef7,#7c3aed);border-radius:var(--radius);padding:24px 28px;color:#fff;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 4px 20px rgba(79,110,247,.35)}
+.today-left .today-label{font-size:13px;opacity:.85;margin-bottom:6px}
+.today-left .today-value{font-size:42px;font-weight:800;letter-spacing:-2px;line-height:1}
+.today-left .today-unit{font-size:18px;font-weight:500;margin-left:4px}
+.today-right{text-align:right}
+.today-right .today-hint{font-size:12px;opacity:.75;margin-bottom:4px}
+.today-progress-wrap{width:160px;height:8px;background:rgba(255,255,255,.25);border-radius:4px;overflow:hidden}
+.today-progress-fill{height:100%;background:#fff;border-radius:4px;transition:width .6s}
+.today-right .today-goal{font-size:11px;opacity:.65;margin-top:4px}
+
+.summary-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow)}
+.stat-label{font-size:12px;color:var(--text2);margin-bottom:6px}
+.stat-value{font-size:26px;font-weight:700;color:var(--text1);letter-spacing:-.5px}
+.stat-value.accent{color:var(--accent)}
+
+.heatmap-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px 32px;box-shadow:var(--shadow);overflow-x:auto}
+.card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+.card-title{font-size:16px;font-weight:700}
+.legend{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text3)}
+.legend-cell{width:13px;height:13px;border-radius:3px}
+
+.months-row{display:flex;min-width:max-content;margin-bottom:6px;padding-left:28px}
+.month-label{font-size:11px;color:var(--text3);font-weight:500}
+
+.heatmap-wrap{display:flex;align-items:flex-start;gap:6px}
+.day-labels{display:grid;grid-template-rows:repeat(7,16px);gap:3px;flex-shrink:0;padding-top:2px}
+.day-label{font-size:10px;color:var(--text3);line-height:16px;text-align:right;width:20px}
+.heatmap{display:grid;grid-template-rows:repeat(7,16px);grid-auto-flow:column;gap:3px;min-width:max-content}
+.cell{width:16px;height:16px;border-radius:3px;cursor:pointer;transition:transform .12s,box-shadow .12s;position:relative}
+.cell:hover{transform:scale(1.4);z-index:10;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+.cell.today-cell{outline:2px solid var(--accent);outline-offset:1px}
+.l0{background:var(--h0)}.l1{background:var(--h1)}.l2{background:var(--h2)}.l3{background:var(--h3)}.l4{background:var(--h4)}
+
+.tooltip{position:fixed;background:#1a1d27;color:#fff;font-size:12px;padding:7px 12px;border-radius:8px;pointer-events:none;opacity:0;transition:opacity .1s;white-space:nowrap;z-index:100;box-shadow:0 4px 12px rgba(0,0,0,.3)}
+
+.dist-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px 28px;box-shadow:var(--shadow);margin-top:20px}
+.dist-row{display:flex;flex-direction:column;gap:12px;margin-top:16px}
+.dist-item{display:flex;align-items:center;gap:12px}
+.dist-name{font-size:13px;color:var(--text2);width:110px;flex-shrink:0;font-weight:500}
+.dist-bar-bg{flex:1;height:12px;background:var(--border);border-radius:6px;overflow:hidden}
+.dist-bar-fill{height:100%;border-radius:6px;transition:width .6s cubic-bezier(.4,0,.2,1)}
+.dist-min{font-size:12px;font-weight:600;color:var(--text2);min-width:44px;text-align:right}
+.dist-empty{font-size:13px;color:var(--text3);text-align:center;padding:20px 0}
+
+.error-msg{background:#fef2f2;border:1px solid #fecaca;color:#dc2626;padding:14px 18px;border-radius:10px;font-size:14px;margin-bottom:16px;display:none}
+</style>
+</head>
+<body>
+<div class="page-wrap">
+  <h1 class="page-title">📅 학습 히트맵</h1>
+  <p class="page-sub">일별 학습량을 시각화해 꾸준한 습관을 만들어 보세요</p>
+  <div id="errorMsg" class="error-msg">데이터를 불러오지 못했습니다.</div>
+
+  <!-- 오늘 공부시간 강조 카드 -->
+  <div class="today-card">
+    <div class="today-left">
+      <div class="today-label">⏱ 오늘 공부시간</div>
+      <div><span class="today-value" id="todayMin">0</span><span class="today-unit">분</span></div>
+    </div>
+    <div class="today-right">
+      <div class="today-hint">목표: 120분</div>
+      <div class="today-progress-wrap">
+        <div class="today-progress-fill" id="todayProgress" style="width:0%"></div>
+      </div>
+      <div class="today-goal" id="todayGoalText">0 / 120분</div>
+    </div>
+  </div>
+
+  <!-- 요약 통계 -->
+  <div class="summary-row">
+    <div class="stat-card"><div class="stat-label">이번 주 공부</div><div class="stat-value accent" id="monthTotal">-</div></div>
+    <div class="stat-card"><div class="stat-label">연속 학습일</div><div class="stat-value" id="streakDays">-</div></div>
+    <div class="stat-card"><div class="stat-label">총 학습일</div><div class="stat-value" id="totalDays">-</div></div>
+    <div class="stat-card"><div class="stat-label">일평균 공부</div><div class="stat-value" id="avgMin">-</div></div>
+  </div>
+
+  <!-- 히트맵 -->
+  <div class="heatmap-card">
+    <div class="card-head">
+      <span class="card-title" id="heatmapTitle">2026년 학습 기록</span>
+      <div class="legend">
+        <span>적음</span>
+        <div class="legend-cell" style="background:var(--h0)"></div>
+        <div class="legend-cell" style="background:var(--h1)"></div>
+        <div class="legend-cell" style="background:var(--h2)"></div>
+        <div class="legend-cell" style="background:var(--h3)"></div>
+        <div class="legend-cell" style="background:var(--h4)"></div>
+        <span>많음</span>
+      </div>
+    </div>
+    <div class="months-row" id="monthsRow"></div>
+    <div class="heatmap-wrap">
+      <div class="day-labels" id="dayLabels"></div>
+      <div style="overflow-x:auto">
+        <div class="heatmap" id="heatmap"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 과목별 분포 -->
+  <div class="dist-card">
+    <div class="card-title">과목별 학습 분포 <span style="font-size:12px;color:var(--text3);font-weight:400">(이번 달)</span></div>
+    <div class="dist-row" id="distRow"><div class="dist-empty">데이터 로딩 중...</div></div>
+  </div>
+</div>
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+const MONTHS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+const DAYS   = ['일','월','화','수','목','금','토'];
+const COLORS = ['#4f6ef7','#22c55e','#f59e0b','#ef4444','#a855f7','#06b6d4','#f97316'];
+const GOAL   = 120; // 목표 분
+
+async function apiFetch(url) {
+    const res = await fetch(url, { credentials: 'include' });
+    if (res.status === 401) { location.href = '/auth/login'; return null; }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return res.json();
+}
+
+function fmt(d) {
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function level(min) {
+    if (!min || min === 0) return 0;
+    if (min < 30)  return 1;
+    if (min < 60)  return 2;
+    if (min < 120) return 3;
+    return 4;
+}
+
+function calcStats(data) {
+    // 오늘 날짜 키 (YYYY-MM-DD) - 로컬 타임존 기준
+    const now = new Date();
+    const todayKey = fmt(now);
+
+    // 이번 주 월요일 키
+    const mon = new Date(now);
+    mon.setDate(now.getDate() - (now.getDay() === 0 ? 6 : now.getDay() - 1));
+    const mondayKey = fmt(mon);
+
+    let weekTotal=0, totalDays=0, totalMin=0, todayMin=0;
+    Object.entries(data).forEach(([k, v]) => {
+        if (k === todayKey) todayMin = v;
+        if (k >= mondayKey && k <= todayKey) weekTotal += v;
+        if (v > 0) { totalDays++; totalMin += v; }
+    });
+
+    // 오늘 공부시간 카드
+    document.getElementById('todayMin').textContent = todayMin;
+    const pct = Math.min(Math.round(todayMin / GOAL * 100), 100);
+    document.getElementById('todayProgress').style.width = pct + '%';
+    document.getElementById('todayGoalText').textContent = todayMin + ' / ' + GOAL + '분';
+
+    // 연속 학습일
+    let streak = 0;
+    const todayDate = new Date(now); todayDate.setHours(0,0,0,0);
+    for (let i = 0; i < 365; i++) {
+        const d = new Date(todayDate); d.setDate(todayDate.getDate()-i);
+        if ((data[fmt(d)]||0) > 0) streak++;
+        else if (i > 0) break;
+    }
+
+    document.getElementById('monthTotal').textContent = weekTotal + '분';
+    document.getElementById('streakDays').textContent  = streak + '일';
+    document.getElementById('totalDays').textContent   = totalDays + '일';
+    document.getElementById('avgMin').textContent      = totalDays ? Math.round(totalMin/totalDays)+'분' : '0분';
+}
+
+function renderDayLabels() {
+    const dl = document.getElementById('dayLabels');
+    DAYS.forEach(d => {
+        const s = document.createElement('div');
+        s.className = 'day-label';
+        s.textContent = ['월','수','금'].includes(d) ? d : '';
+        dl.appendChild(s);
+    });
+}
+
+function renderHeatmap(data) {
+    const hm      = document.getElementById('heatmap');
+    const mr      = document.getElementById('monthsRow');
+    const tooltip = document.getElementById('tooltip');
+    const today   = new Date(); today.setHours(0,0,0,0);
+    const todayKey = fmt(today);
+    const year  = today.getFullYear();
+    const start = new Date(year, 0, 1);
+    const end   = new Date(year, 11, 31);
+
+    document.getElementById('heatmapTitle').textContent = year + '년 학습 기록';
+
+    // 1월 1일 앞 빈칸 채우기 (일요일 시작)
+    const startDay = start.getDay();
+    for (let i = 0; i < startDay; i++) {
+        const empty = document.createElement('div');
+        empty.style.cssText = 'width:16px;height:16px;';
+        hm.appendChild(empty);
+    }
+
+    let lastMonth = -1, colWidth = 0;
+    const monthPositions = [];
+    let cur = new Date(start);
+
+    while (cur <= end) {
+        const key = fmt(cur);
+        const min = data[key] || 0;
+        const cell = document.createElement('div');
+        cell.className = 'cell l' + level(min);
+        if (key === todayKey) cell.classList.add('today-cell');
+        cell.dataset.date = key;
+        cell.dataset.min  = min;
+
+        cell.addEventListener('mouseenter', e => {
+            const m = parseInt(e.target.dataset.min);
+            const d = e.target.dataset.date;
+            const isToday = d === todayKey;
+            tooltip.textContent = d + (isToday ? ' (오늘)' : '') + ' · ' + (m > 0 ? m + '분 공부' : '공부 없음');
+            tooltip.style.opacity = '1';
+        });
+        cell.addEventListener('mousemove', e => {
+            tooltip.style.left = (e.clientX + 14) + 'px';
+            tooltip.style.top  = (e.clientY - 32) + 'px';
+        });
+        cell.addEventListener('mouseleave', () => tooltip.style.opacity = '0');
+        hm.appendChild(cell);
+
+        // 월 레이블
+        if (cur.getMonth() !== lastMonth) {
+            monthPositions.push({ month: cur.getMonth(), col: colWidth });
+            lastMonth = cur.getMonth();
+        }
+        if (cur.getDay() === 6) colWidth++;
+        cur.setDate(cur.getDate() + 1);
+    }
+
+    // 월 레이블 렌더링
+    monthPositions.forEach((mp, i) => {
+        const span = document.createElement('span');
+        span.className = 'month-label';
+        span.textContent = MONTHS[mp.month];
+        const nextCol = i + 1 < monthPositions.length ? monthPositions[i+1].col : colWidth;
+        span.style.cssText = 'display:inline-block;width:' + ((nextCol - mp.col) * 19) + 'px;';
+        mr.appendChild(span);
+    });
+}
+
+async function renderDistribution() {
+    try {
+        const stat = await apiFetch('/api/analytics/statistics');
+        if (!stat) return;
+        const row = document.getElementById('distRow');
+        const labels = stat.barLabels || [];
+        const values = stat.monthData || stat.weekData || [];
+        if (!labels.length) {
+            row.innerHTML = '<div class="dist-empty">과목 데이터가 없습니다</div>';
+            return;
+        }
+        const max = Math.max(...values, 1);
+        row.innerHTML = '';
+        labels.forEach((name, i) => {
+            const min = values[i] || 0;
+            const pct = Math.round(min / max * 100);
+            const el = document.createElement('div');
+            el.className = 'dist-item';
+            el.innerHTML = `
+              <span class="dist-name">${name}</span>
+              <div class="dist-bar-bg">
+                <div class="dist-bar-fill" style="width:0%;background:${COLORS[i%COLORS.length]}"></div>
+              </div>
+              <span class="dist-min">${min}분</span>`;
+            row.appendChild(el);
+            // 애니메이션
+            setTimeout(() => {
+                el.querySelector('.dist-bar-fill').style.width = pct + '%';
+            }, 100 + i * 80);
+        });
+    } catch(e) {
+        document.getElementById('distRow').innerHTML = '<div class="dist-empty">과목 데이터를 불러오지 못했습니다</div>';
+    }
+}
+
+async function init() {
+    renderDayLabels();
+    try {
+        const [heatmapData, summary] = await Promise.all([
+            apiFetch('/api/analytics/heatmap?days=365'),
+            apiFetch('/api/analytics/activity-summary')
+        ]);
+        if (!heatmapData) return;
+        calcStats(heatmapData);
+        renderHeatmap(heatmapData);
+        if (summary) {
+            document.getElementById('streakDays').textContent = summary.streakDays + '일';
+            // 오늘 분은 activity-summary에서도 가져옴
+            if (summary.todayMinutes !== undefined) {
+                document.getElementById('todayMin').textContent = summary.todayMinutes;
+                const pct = Math.min(Math.round(summary.todayMinutes / GOAL * 100), 100);
+                document.getElementById('todayProgress').style.width = pct + '%';
+                document.getElementById('todayGoalText').textContent = summary.todayMinutes + ' / ' + GOAL + '분';
+            }
+        }
+        renderDistribution();
+    } catch(e) {
+        document.getElementById('errorMsg').style.display = 'block';
+        console.error(e);
+    }
+}
+
+init();
+</script>
+</body>
+</html>

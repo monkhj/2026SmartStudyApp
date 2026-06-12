@@ -1,0 +1,13 @@
+server.port=8080
+spring.data.mongodb.uri=mongodb+srv://아이디:비밀번호@cluster.mongodb.net/smartstudy
+groq.api.key=여기에_GROQ_API_키_입력
+groq.api.model=llama-3.3-70b-versatile
+jwt.secret=32자_이상_시크릿_키
+spring.mail.host=smtp.gmail.com
+spring.mail.port=587
+spring.mail.username=이메일@gmail.com
+spring.mail.password=앱_비밀번호
+spring.mail.properties.mail.smtp.auth=true
+spring.mail.properties.mail.smtp.starttls.enable=true
+spring.thymeleaf.cache=false
+spring.jackson.serialization.write-dates-as-timestamps=false

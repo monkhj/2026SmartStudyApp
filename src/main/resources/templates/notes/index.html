@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>학습 노트 — Smart Study AI</title>
+    <link rel="stylesheet" th:href="@{/css/main.css}">
+    <style>
+        .note-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px 24px;
+            margin-bottom: 14px;
+            box-shadow: 0 1px 4px rgba(0,0,0,.06);
+            transition: box-shadow .2s, transform .2s;
+        }
+        .note-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.1); transform: translateY(-1px); }
+        .card-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+        .note-title { font-size:15px; font-weight:600; color:var(--text-main); text-decoration:none; }
+        .note-title:hover { color:var(--primary); }
+        .note-date { font-size:12px; color:var(--text-sub); }
+        .keywords { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; min-height:28px; }
+        .keyword-tag { background:#ebf4ff; color:#2b6cb0; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:500; }
+        .no-keywords { color:var(--text-sub); font-size:12px; font-style:italic; }
+        .card-bottom { display:flex; justify-content:flex-end; align-items:center; gap:8px; border-top:1px solid var(--border); padding-top:12px; }
+        .btn-delete { background:none; border:1px solid var(--border); color:var(--text-sub); padding:6px 14px; border-radius:6px; font-size:12px; cursor:pointer; transition:all .2s; }
+        .btn-delete:hover { background:#fff5f5; color:#e53e3e; border-color:#feb2b2; }
+        .btn-detail { background:var(--surface); border:1px solid var(--border); color:var(--text-main); padding:6px 14px; border-radius:6px; font-size:12px; text-decoration:none; }
+        .btn-quiz { background:var(--primary); color:#fff; padding:6px 14px; border-radius:6px; font-size:12px; text-decoration:none; }
+
+        .empty-state { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:50vh; text-align:center; }
+        .empty-icon { font-size:56px; margin-bottom:16px; }
+        .empty-state h2 { font-size:18px; color:var(--text-main); margin-bottom:8px; }
+        .empty-state p { color:var(--text-sub); margin-bottom:28px; font-size:14px; line-height:1.6; }
+        .btn-create { display:inline-block; background:var(--primary); color:#fff; padding:12px 32px; border-radius:10px; text-decoration:none; font-weight:700; font-size:14px; }
+        .filter-bar { display:flex; align-items:center; gap:10px; margin-bottom:16px; }
+        .filter-bar select { font-size:13px; padding:7px 12px; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text-main); cursor:pointer; outline:none; }
+        .filter-bar select:focus { border-color:var(--primary); }
+        .subject-tabs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+        .subject-tab { padding:6px 14px; border-radius:20px; font-size:13px; font-weight:500; cursor:pointer; border:1px solid var(--border); background:var(--surface); color:var(--text-sub); transition:all .2s; }
+        .subject-tab:hover { border-color:var(--primary); color:var(--primary); }
+        .subject-tab.active { background:var(--primary); color:#fff; border-color:var(--primary); }
+        .note-subject-badge { font-size:11px; padding:2px 8px; background:#ebf4ff; color:#2b6cb0; border-radius:10px; margin-left:6px; font-weight:500; }
+    </style>
+</head>
+<body>
+<div class="app-layout">
+    <div th:replace="~{fragments/sidebar :: sidebar('notes')}"></div>
+
+    <main class="main-content">
+        <div class="page-header">
+            <div>
+                <div class="page-title">📝 학습 노트</div>
+                <div class="page-subtitle">AI가 노트를 분석해 요약과 퀴즈를 자동으로 생성합니다</div>
+            </div>
+            <a href="/notes/new" class="btn btn-primary">+ 새 노트 작성</a>
+        </div>
+
+        <!-- 빈 상태 -->
+        <div th:if="${notes.isEmpty()}" class="empty-state">
+            <div class="empty-icon">📝</div>
+            <h2>아직 작성된 노트가 없어요</h2>
+            <p>첫 번째 노트를 작성하고<br>AI 분석을 시작해보세요!</p>
+            <a href="/notes/new" class="btn-create">노트 생성하기</a>
+        </div>
+
+        <!-- 노트 목록 -->
+        <div th:if="${!notes.isEmpty()}">
+            <!-- 과목별 탭 -->
+            <div class="subject-tabs" id="subjectTabs">
+                <button class="subject-tab active" data-subject="" onclick="filterBySubject(this, '')">전체</button>
+            </div>
+
+            <!-- 필터 바 -->
+            <div class="filter-bar">
+                <p style="font-size:13px;color:var(--text-sub);margin:0">
+                    <span id="noteCount">총 <strong th:text="${notes.size()}">0</strong>개</span>의 노트
+                </p>
+                <select id="sortSel" onchange="sortNotes()">
+                    <option value="desc">최신순</option>
+                    <option value="asc">오래된순</option>
+                </select>
+            </div>
+
+            <div id="noteList">
+            <div th:each="note : ${notes}" class="note-card"
+                 th:data-date="${note.createdAt != null ? note.createdAt.toString() : ''}"
+                 th:data-subject="${note.subjectId != null ? note.subjectId : ''}">
+                <div class="card-top">
+                    <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px">
+                        <a th:href="@{/notes/{id}(id=${note.id})}" class="note-title"
+                           th:text="${note.title != null and !note.title.isBlank() ? note.title : '제목 없음'}">노트 제목</a>
+                        <span class="note-subject-badge"
+                              th:if="${note.subjectId != null and !note.subjectId.isBlank() and note.subjectId != 'general'}"
+                              th:text="${note.subjectId}"></span>
+                    </div>
+                    <span class="note-date" th:text="${note.createdAt != null ? note.createdAt.toLocalDate() : ''}"></span>
+                </div>
+                <div class="keywords">
+                    <span th:if="${note.keywords == null or note.keywords.isEmpty()}" class="no-keywords">키워드 없음</span>
+                    <span th:each="kw : ${note.keywords}" class="keyword-tag" th:text="${kw}"></span>
+                </div>
+                <div class="card-bottom">
+                    <button class="btn-delete" th:data-id="${note.id}" onclick="deleteNote(this)">삭제</button>
+                    <a th:href="@{/notes/{id}(id=${note.id})}" class="btn-detail">열람</a>
+                    <a th:if="${note.questions != null and !note.questions.isEmpty()}"
+                       th:href="|/notes/${note.id}#quiz|"
+                       class="btn-quiz">퀴즈 보기</a>
+                </div>
+            </div>
+            </div><!-- #noteList -->
+        </div>
+    </main>
+</div>
+
+<script>
+    let currentSubject = '';
+
+    // 과목 탭 초기화
+    window.addEventListener('DOMContentLoaded', () => {
+        const cards = document.querySelectorAll('.note-card');
+        const subjects = new Set();
+        cards.forEach(c => {
+            const s = c.dataset.subject;
+            if (s && s !== 'general') subjects.add(s);
+        });
+        const tabsEl = document.getElementById('subjectTabs');
+        subjects.forEach(s => {
+            const btn = document.createElement('button');
+            btn.className = 'subject-tab';
+            btn.dataset.subject = s;
+            btn.textContent = s;
+            btn.onclick = () => filterBySubject(btn, s);
+            tabsEl.appendChild(btn);
+        });
+    });
+
+    function filterBySubject(btn, subject) {
+        currentSubject = subject;
+        document.querySelectorAll('.subject-tab').forEach(t => t.classList.remove('active'));
+        btn.classList.add('active');
+        const cards = document.querySelectorAll('#noteList .note-card');
+        let visible = 0;
+        cards.forEach(c => {
+            const match = !subject || c.dataset.subject === subject;
+            c.style.display = match ? '' : 'none';
+            if (match) visible++;
+        });
+        document.getElementById('noteCount').innerHTML = '총 <strong>' + visible + '</strong>개';
+    }
+
+    function sortNotes() {
+        const sort = document.getElementById('sortSel').value;
+        const list = document.getElementById('noteList');
+        if (!list) return;
+        const cards = Array.from(list.querySelectorAll('.note-card'));
+        cards.sort((a, b) => {
+            const da = new Date(a.dataset.date || 0).getTime();
+            const db = new Date(b.dataset.date || 0).getTime();
+            return sort === 'asc' ? da - db : db - da;
+        });
+        cards.forEach(c => list.appendChild(c));
+        // 탭 필터 재적용
+        if (currentSubject) filterBySubject(
+            document.querySelector(`.subject-tab[data-subject="${currentSubject}"]`),
+            currentSubject
+        );
+    }
+
+    async function deleteNote(btn) {
+        const id = btn.dataset.id;
+        if (!confirm('이 노트를 삭제하시겠습니까?')) return;
+        const res = await fetch('/notes/' + id, { method: 'DELETE' });
+        if (res.ok) location.reload();
+        else alert('삭제에 실패했습니다.');
+    }
+</script>
+</body>
+</html>

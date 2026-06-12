@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>오답 노트 | Smart Study AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f6fa;--surface:#fff;--border:#e4e6ef;
+  --text1:#1a1d27;--text2:#5a5f7a;--text3:#9499b5;
+  --accent:#4f6ef7;--accent-bg:#eef1fe;
+  --red:#ef4444;--red-bg:#fef2f2;--red-border:#fecaca;
+  --green:#16a34a;--green-bg:#f0fdf4;--green-border:#bbf7d0;
+  --radius:14px;--shadow:0 1px 4px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.04);
+}
+body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);color:var(--text1);min-height:100vh;padding:32px}
+.page-wrap{max-width:800px;margin:0 auto}
+.page-title{font-size:22px;font-weight:700;margin-bottom:4px;letter-spacing:-.4px}
+.page-sub{font-size:14px;color:var(--text2);margin-bottom:24px}
+.toolbar{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center}
+.toolbar select{font-family:'Pretendard',sans-serif;font-size:13px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text1);cursor:pointer;outline:none}
+.toolbar select:focus{border-color:var(--accent)}
+.count-badge{margin-left:auto;font-size:13px;color:var(--text2);background:var(--surface);border:1px solid var(--border);padding:6px 14px;border-radius:20px}
+.list{display:flex;flex-direction:column;gap:12px}
+.item{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);transition:box-shadow .15s}
+.item:hover{box-shadow:0 2px 16px rgba(79,110,247,.12)}
+.item-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.subject-pill{font-size:11px;font-weight:600;padding:4px 10px;border-radius:6px;background:var(--accent-bg);color:var(--accent)}
+.item-date{font-size:12px;color:var(--text3)}
+.question{font-size:15px;line-height:1.65;margin-bottom:14px}
+.answer-row{display:flex;align-items:stretch;gap:10px;margin-bottom:14px}
+.answer-box{flex:1;padding:10px 14px;border-radius:10px;font-size:13px;font-weight:500}
+.box-wrong{background:var(--red-bg);border:1px solid var(--red-border);color:var(--red)}
+.box-correct{background:var(--green-bg);border:1px solid var(--green-border);color:var(--green)}
+.answer-label{display:block;font-size:10px;font-weight:600;margin-bottom:4px;opacity:.7}
+.arrow{display:flex;align-items:center;color:var(--text3);font-size:18px;padding:0 4px}
+details{border-top:1px solid var(--border);padding-top:12px}
+details summary{font-size:13px;font-weight:600;color:var(--accent);cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px}
+details summary::before{content:'▶';font-size:9px;transition:transform .2s}
+details[open] summary::before{transform:rotate(90deg)}
+.explanation{font-size:13px;color:var(--text2);line-height:1.75;margin-top:10px;padding-left:12px;border-left:3px solid var(--accent-bg)}
+.skeleton{background:linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:6px;height:18px;margin-bottom:8px}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.skeleton-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:12px}
+.empty{text-align:center;padding:60px 0;color:var(--text3)}
+.empty-icon{font-size:48px;display:block;margin-bottom:12px}
+.error-msg{background:#fef2f2;border:1px solid #fecaca;color:#dc2626;padding:14px 18px;border-radius:10px;font-size:14px;margin-bottom:16px;display:none}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<div class="page-wrap">
+  <h1 class="page-title">❌ 오답 노트</h1>
+  <p class="page-sub">틀린 문제를 다시 확인하고 개념을 완성하세요</p>
+  <div id="errorMsg" class="error-msg">데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.</div>
+  <div class="toolbar">
+    <select id="subjectSel" onchange="applyFilter()"><option value="">전체 과목</option></select>
+    <select id="periodSel" onchange="applyFilter()">
+      <option value="0">전체 기간</option>
+      <option value="7">최근 7일</option>
+      <option value="30">최근 30일</option>
+    </select>
+    <select id="sortSel" onchange="applyFilter()">
+      <option value="desc">최신순</option>
+      <option value="asc">오래된순</option>
+    </select>
+    <span class="count-badge" id="countBadge">로딩 중...</span>
+  </div>
+  <div id="skeletonArea">
+    <div class="skeleton-card"><div class="skeleton" style="width:30%"></div><div class="skeleton" style="width:80%"></div><div class="skeleton" style="width:60%"></div></div>
+    <div class="skeleton-card"><div class="skeleton" style="width:25%"></div><div class="skeleton" style="width:70%"></div><div class="skeleton" style="width:55%"></div></div>
+  </div>
+  <div class="list" id="list" style="display:none"></div>
+  <div class="empty hidden" id="empty"><span class="empty-icon">🎉</span><p>조건에 맞는 오답이 없습니다</p></div>
+</div>
+<script>
+let allData = [];
+
+async function apiFetch(url) {
+    const token = localStorage.getItem('accessToken');
+    const headers = token ? {'Authorization':'Bearer '+token} : {};
+    const res = await fetch(url, {
+        headers: headers,
+        credentials: 'include'  // 세션 쿠키 포함
+    });
+    if (res.status === 401) { location.href = '/auth/login'; return null; }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return res.json();
+}
+
+function formatDate(iso) { return iso ? iso.slice(0,10).replace(/-/g,'.') : ''; }
+function daysAgo(iso) { return (Date.now() - new Date(iso).getTime()) / 86400000; }
+function esc(s) { return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+async function loadSubjects() {
+    try {
+        const subjects = await apiFetch('/api/analytics/subjects');
+        if (!subjects) return;
+        const sel = document.getElementById('subjectSel');
+        subjects.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.id; opt.textContent = s.name;
+            sel.appendChild(opt);
+        });
+    } catch(e) { console.warn('과목 로드 실패', e); }
+}
+
+async function loadWrongAnswers() {
+    try {
+        const data = await apiFetch('/api/analytics/wrong-answers');
+        if (!data) return;
+        allData = data;
+        document.getElementById('skeletonArea').classList.add('hidden');
+        applyFilter();
+    } catch(e) {
+        document.getElementById('skeletonArea').classList.add('hidden');
+        document.getElementById('errorMsg').style.display = 'block';
+    }
+}
+
+function applyFilter() {
+    const subjectId = document.getElementById('subjectSel').value;
+    const days = parseInt(document.getElementById('periodSel').value);
+    const filtered = allData.filter(d => {
+        if (subjectId && d.subjectId !== subjectId) return false;
+        if (days > 0 && daysAgo(d.solvedAt) > days) return false;
+        return true;
+    });
+    // 정렬
+    const sort = document.getElementById('sortSel')?.value || 'desc';
+    filtered.sort((a, b) => {
+        const ta = new Date(a.solvedAt).getTime();
+        const tb = new Date(b.solvedAt).getTime();
+        return sort === 'asc' ? ta - tb : tb - ta;
+    });
+    document.getElementById('countBadge').textContent = filtered.length + '개 오답';
+    renderList(filtered);
+}
+
+function renderList(items) {
+    const list = document.getElementById('list');
+    const empty = document.getElementById('empty');
+    if (!items.length) {
+        list.style.display = 'none';
+        empty.classList.remove('hidden');
+        return;
+    }
+    empty.classList.add('hidden');
+    list.style.display = 'flex';
+    list.innerHTML = items.map(d => `
+      <div class="item" id="item-${d.id}">
+        <div class="item-head">
+          <span class="subject-pill">${esc(d.subjectName)}</span>
+          <span style="display:flex;align-items:center;gap:8px">
+            <span class="item-date">${formatDate(d.solvedAt)}</span>
+            <button class="btn-delete-item" onclick="deleteWrongAnswer('${d.id}')">삭제</button>
+          </span>
+        </div>
+        <p class="question">Q. ${esc(d.questionText)}</p>
+        <div class="answer-row">
+          <div class="answer-box box-wrong"><span class="answer-label">내 답</span>${esc(d.userAnswer)}</div>
+          <div class="arrow">→</div>
+          <div class="answer-box box-correct"><span class="answer-label">정답</span>${esc(d.correctAnswer)}</div>
+        </div>
+        <details><summary>해설 보기</summary><p class="explanation">${esc(d.explanation)}</p></details>
+      </div>`).join('');
+}
+
+async function deleteWrongAnswer(id) {
+    if (!confirm('이 오답을 삭제하시겠습니까?')) return;
+    try {
+        const res = await fetch('/api/analytics/wrong-answers/' + id, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+        if (res.ok) {
+            document.getElementById('item-' + id)?.remove();
+            // 남은 아이템 확인
+            if (!document.querySelector('.item')) {
+                document.getElementById('list').style.display = 'none';
+                document.getElementById('empty').classList.remove('hidden');
+            }
+        }
+    } catch(e) { alert('삭제 실패'); }
+}
+
+loadSubjects();
+loadWrongAnswers();
+</script>
+</body>
+</html>
