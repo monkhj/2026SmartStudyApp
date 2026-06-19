@@ -1,4 +1,4 @@
-server.port=8080
+server.port=${PORT:8080}
 spring.data.mongodb.uri=mongodb+srv://아이디:비밀번호@cluster.mongodb.net/smartstudy
 groq.api.key=여기에_GROQ_API_키_입력
 groq.api.model=llama-3.3-70b-versatile
